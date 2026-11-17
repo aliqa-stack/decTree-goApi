@@ -20,8 +20,8 @@ type Responses struct {
 var R *Node
 
 func main(){
-	x := []float64{2,4,5,6,8,10}
-	y := []int {0,0,0,1,1,1}
+	x := []float64{2,4,5,6,8,10,12,14,16,18,20,22,24,26,28,30}
+	y := []int {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1}
 
 	R = TREE(y,x,0,3)
 	mux := http.NewServeMux()
