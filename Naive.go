@@ -1,164 +1,162 @@
+
 package main
 
 import (
     "encoding/csv"
     "fmt"
     "log"
+    "math"
     "os"
     "strings"
     "unicode"
-	"math"
 )
 
-type Assets struct{
-	freqs 	map[string]int{}
-	HamW 	map[string]int{}
-	vocab  	map[string]bool{}
-	spamDocs  int
-	hamDocs  	int
-	totalSpamWords  int
-	totalHamWords  int
-	spam  int
-	ham  int
-	spamEmails  []string{}
-	hamEmails  []string{}
-	
+type Assets struct {
+    freqs map[string]int
+    HamW  map[string]int
+    SpamW map[string]int
+    vocab map[string]bool
 
+    spamDocs       int
+    hamDocs        int
+    totalSpamWords int
+    totalHamWords int
 }
 
-//TOKENIZATION THE STRINGS
+// TOKENIZATION
 func tokenize(text string) []string {
     text = strings.ToLower(text)
+
     return strings.FieldsFunc(text, func(r rune) bool {
         return !unicode.IsLetter(r)
     })
 }
 
-func Opencsv(file string) string{
-	
-	Filename, err := os.Open(file)
+// OPEN CSV
+func OpenCSV(file string) ([][]string, error) {
+    filename, err := os.Open(file)
     if err != nil {
-        log.Fatalf("cannot open file: %v", err)
+        return nil, err
     }
-    defer file.Close()
+    defer filename.Close()
 
-    reader := csv.NewReader(FileName)
+    reader := csv.NewReader(filename)
+
     records, err := reader.ReadAll()
     if err != nil {
-        log.Fatalf("cannot read file: %v", err)
+        return nil, err
     }
 
-	return records
-}
-func train(file string) (bool, string){
-	Records := Opencsv(file)
-	assets := new(Assets)
-	var logHam float64
-	var logSpam float64
-
-	for r, row := range Records{
-		if r == 0 {
-			continue
-		}
-
-		labels := row[1]
-		text := row[2]
-		tokens := tokenize(text)
-
-		//hitung spam dan ham berdasarkan label
-			if labels == "spam" {
-				assets.spamDocs++
-				for w := range freqs{
-					assets.SpamW[w]++
-					assets.totalSpamWords++
-					assets.vocab[w] = true
-				}
-				} else {
-					assets.hamDocs++
-					for h := range freqs {
-						assets.HamW[h]++
-						assets.totalHamWords++
-						assets.vocab[h] = true
-					}
-				}
-        
-		//hitung probabilitas dari kata
-		totalCount := float64(assets.spamDocs + assets.hamDocs)
-		//bagi total kata dengan spam
-		spam_train := float64(assets.spamDocs)/totalCount
-		ham_train := float64(assets.hamDocs)/totalCount
-
-		logSpam = math.Log(spam_train)	
-		logHam = math.Log(ham_train)
-		vocabsize := float64(len(assets.vocab))
-
-
-		
-		for _, token := range tokens {
-            assets.freqs[token]++
-			spamWord := assets.SpamW[token]
-			//laplace smoothing menghindari probabilitas 0
-			likehood_s := float64(spamWord + 1) / (float64(assets.totalSpamWords) + vocabsize)
-			logSpam += math.Log(likehood_s)
-
-			//fmt.Println(freqs)
-
-			hamWord:= assets.HamW[token]
-			likehood_h := float64(hamWord + 1) / (float64(assets.totalHamWords) + vocabsize)
-			logHam += math.Log(likehood_h)
-			
-			fmt.Printf("v %s", token)
-
-			fmt.Printf("ham probability  %f  spam probability %f \n", likehood_s, likehood_h)
-				
-	}
-	
+    return records, nil
 }
 
-	return logSpam > logHam ? "spam" : "ham"
-}
+// TRAINING
+func train(file string) (*Assets, error) {
+    records, err := OpenCSV(file)
+    if err != nil {
+        return nil, err
+    }
 
-func main() {
-    
+    assets := &Assets{
+        freqs: make(map[string]int),
+        HamW:  make(map[string]int),
+        SpamW: make(map[string]int),
+        vocab: make(map[string]bool),
+    }
 
-	spamEmails := []string{}
-	hamEmails := []string{}
-	
-    //output the text in csv file
     for r, row := range records {
         if r == 0 {
             continue
         }
 
+        if len(row) < 3 {
+            continue
+        }
 
-
-		labels := row[1]
+        label := strings.ToLower(strings.TrimSpace(row[1]))
         text := row[2]
+
         tokens := tokenize(text)
 
-	       
-		
-		
-		//count if logspam bigger then logham 
-		if logSpam > logHam {
-			spam++
-			spamEmails = append(spamEmails, text)
-            fmt.Printf("\n %v spam email \n", r)
+        if label != "spam" && label != "ham" {
+            continue
+        }
 
-            fmt.Printf("this email is spam %s", text)
-			
-			} else {
-				ham++
+        if label == "spam" {
+            assets.spamDocs++
 
-			hamEmails = append(hamEmails, text)
-            fmt.Printf("\n %v ham email \n", r)
+            for _, word := range tokens {
+                assets.SpamW[word]++
+                assets.totalSpamWords++
+                assets.vocab[word] = true
+            }
 
-            fmt.Printf("this email  %s", text)
-			}
-		
-	}
-   
-		fmt.Printf("ham %d \n", ham)
-  
+        } else {
+            assets.hamDocs++
+
+            for _, word := range tokens {
+                assets.HamW[word]++
+                assets.totalHamWords++
+                assets.vocab[word] = true
+            }
+        }
+    }
+
+    if assets.spamDocs + assets.hamDocs == 0 {
+        return nil, fmt.Errorf("no valid training data")
+    }
+
+    return assets, nil
 }
 
+// PREDICTION
+func (a *Assets) Predictmsg(text string) string {
+    tokens := tokenize(text)
+
+    totalDocs := float64(a.spamDocs + a.hamDocs)
+
+    logSpam := math.Log(float64(a.spamDocs) / totalDocs)
+    logHam := math.Log(float64(a.hamDocs) / totalDocs)
+
+    vocabSize := float64(len(a.vocab))
+
+    for _, token := range tokens {
+
+        if !a.vocab[token] {
+            continue
+        }
+
+        spamWord := float64(a.SpamW[token])
+
+        likelihoodSpam := (spamWord + 1) /
+            (float64(a.totalSpamWords) + vocabSize)
+
+        logSpam += math.Log(likelihoodSpam)
+
+        hamWord := float64(a.HamW[token])
+
+        likelihoodHam := (hamWord + 1) /
+            (float64(a.totalHamWords) + vocabSize)
+
+        logHam += math.Log(likelihoodHam)
+    }
+
+    if logSpam > logHam {
+        return "spam"
+    }
+
+    return "ham"
+}
+
+//func main() {
+    //model, err := train("email_dataset.csv")
+    //if err != nil {
+        //log.Fatal(err)
+    //}
+
+    //email := "Congratulations you won a free prize"
+
+    //prediction := model.Predict(email)
+
+    //fmt.Println("Prediction:", prediction)
+//}
