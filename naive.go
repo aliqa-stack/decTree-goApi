@@ -4,7 +4,7 @@ package main
 import (
     "encoding/csv"
     "fmt"
-    "log"
+    _"log"
     "math"
     "os"
     "strings"
@@ -110,7 +110,7 @@ func train(file string) (*Assets, error) {
 }
 
 // PREDICTION
-func (a *Assets) Predictmsg(text string) string {
+func (a *Assets) PredictMsg(text string) string {
     tokens := tokenize(text)
 
     totalDocs := float64(a.spamDocs + a.hamDocs)

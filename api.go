@@ -1,10 +1,12 @@
 package main
 
 import(
-	_"fmt"
+	"fmt"
 	"log"
 	"net/http"
 	"encoding/json"
+	_"io/ioutil"
+	"os"
 )
 
 type Branch struct {
@@ -25,18 +27,28 @@ type MsgResponse struct {
 	ChatResponses string `json:"chatresponses`
 }
 
+type Data struct {
+	UserInput float64 `json:"feature"` 
+	UserResponse int `json:"predict`
+}
+
 var R *Node
 
 func main(){
 	x := []float64{2,4,5,6,8,10,12,14,16,18,20,22,24,26,28,30}
 	y := []int {0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1}
-	NaiveModel, err := train("email_dataset.csv")
+	_, err := train("email_dataset.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	R = TREE(y,x,0,3)
 	mux := http.NewServeMux()
+	data:= Readfile("user.json")
+//	if err != nil {
+		//log.Println(err)
+	//}
+	fmt.Println(data)
 
 	mux.HandleFunc("POST /tree", makeTree)
 	mux.HandleFunc("POST /Cekspam", Spamcek)
@@ -67,6 +79,7 @@ func makeTree(w http.ResponseWriter, r *http.Request){
 
 func Spamcek(w http.ResponseWriter, r *http.Request){
 	var msg Message
+	m := &Assets{}
 	
 	err := json.NewDecoder(r.Body).Decode(&msg)
 	if err != nil {
@@ -74,9 +87,9 @@ func Spamcek(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	result := Predictmsg(msg.Chat)
+	result := m.PredictMsg(msg.Chat)
 	response := MsgResponse{
-		ChatResponses: result
+		ChatResponses: result,
 	}
 
 
@@ -85,5 +98,35 @@ func Spamcek(w http.ResponseWriter, r *http.Request){
 	json.NewEncoder(w).Encode(response)
 
 
+}
+
+func checkfile(file string)error{
+	_, err := os.Stat(file)
+	if os.IsNotExist(err){
+		_, err := os.Create(file)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Readfile(file string) (Data){
+	err := checkfile(file)
+	if err != nil {
+		log.Println(err)
+	}
+
+	filename, err := os.ReadFile(file)
+	if err != nil {
+		log.Println(err)
+
+	}
+	var data Data
+	err = json.Unmarshal(filename, &data)
+	  if err != nil {
+		log.Println(err)
+	}
+	 return data
 }
 
