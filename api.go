@@ -52,6 +52,7 @@ func main(){
 
 	mux.HandleFunc("POST /tree", makeTree)
 	mux.HandleFunc("POST /Cekspam", Spamcek)
+	mux.HandleFunc("POST /Write", Userwrite)
 	log.Println("server running on 8080")
 	log.Fatal(http.ListenAndServe(":8080",mux))
 }
@@ -128,5 +129,26 @@ func Readfile(file string) (Data){
 		log.Println(err)
 	}
 	 return data
+}
+
+func Userwrite(w http.ResponseWriter, r *http.Request) {
+	var data Data
+	err := json.NewDecoder(r.Body).Decode(&data)
+
+	jsonStr, err := json.MarshallIndent(data, "", " ")
+	if err != nil {
+		fmt.Println("failed encode json", err)
+	}
+
+	err = os.Writefile("user.json", jsonStr, 0644)
+	if err != nil {
+		fmt.Println("failed write the json", err)
+	}
+
+	w.Header().Set("Conten-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(`{"message": "data berhasil disimpan"}`))
+
+
 }
 
