@@ -1,4 +1,10 @@
-{
-    "feature":1.1,
-    "predict": 1
-}
+[
+ {
+  "feature": 0,
+  "UserResponse": 0
+ },
+ {
+  "feature": 4.5,
+  "UserResponse": 0
+ }
+]

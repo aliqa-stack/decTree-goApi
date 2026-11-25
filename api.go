@@ -1,7 +1,7 @@
 package main
 
 import(
-	"fmt"
+	_"fmt"
 	"log"
 	"net/http"
 	"encoding/json"
@@ -10,7 +10,7 @@ import(
 )
 
 type Branch struct {
-	Feature float64 `json:"feature"`
+	Feature float64 `json:"featureData"`
 
 
 }
@@ -44,15 +44,10 @@ func main(){
 
 	R = TREE(y,x,0,3)
 	mux := http.NewServeMux()
-	data:= Readfile("user.json")
-//	if err != nil {
-		//log.Println(err)
-	//}
-	fmt.Println(data)
+
 
 	mux.HandleFunc("POST /tree", makeTree)
 	mux.HandleFunc("POST /Cekspam", Spamcek)
-	mux.HandleFunc("POST /Write", Userwrite)
 	log.Println("server running on 8080")
 	log.Fatal(http.ListenAndServe(":8080",mux))
 }
@@ -68,6 +63,11 @@ func makeTree(w http.ResponseWriter, r *http.Request){
 	}
 
 	result := Predict(R,branch.Feature)
+	history := Data{
+		UserInput: branch.Feature,
+		UserResponse: result,
+	}
+	err = Userwrite("user.json", history)
 	response := Responses{
 		Prediction: result,
 	}
@@ -85,6 +85,7 @@ func Spamcek(w http.ResponseWriter, r *http.Request){
 	err := json.NewDecoder(r.Body).Decode(&msg)
 	if err != nil {
 		http.Error(w, "invalid message", http.StatusBadRequest)
+		log.Println(err)
 		return
 	}
 
@@ -112,43 +113,48 @@ func checkfile(file string)error{
 	return nil
 }
 
-func Readfile(file string) (Data){
+func Readfile(file string) ([]Data, error){
 	err := checkfile(file)
 	if err != nil {
 		log.Println(err)
+		return nil, err
 	}
 
 	filename, err := os.ReadFile(file)
+	if os.IsNotExist(err) {
+		return []Data{}, nil
+	}
 	if err != nil {
 		log.Println(err)
+		return nil, err
 
 	}
-	var data Data
+	if len(file) == 0{
+		return []Data{}, nil
+	}
+	var data []Data
 	err = json.Unmarshal(filename, &data)
 	  if err != nil {
 		log.Println(err)
+		return nil, err
 	}
-	 return data
+	 return data, nil
 }
 
-func Userwrite(w http.ResponseWriter, r *http.Request) {
-	var data Data
-	err := json.NewDecoder(r.Body).Decode(&data)
-
-	jsonStr, err := json.MarshallIndent(data, "", " ")
+func Userwrite(file string, newData Data) error {
+	data , err:= Readfile(file)
 	if err != nil {
-		fmt.Println("failed encode json", err)
+		return err
 	}
 
-	err = os.Writefile("user.json", jsonStr, 0644)
+	data = append(data, newData)
+
+	content, err := json.MarshalIndent(data, "", " ")
 	if err != nil {
-		fmt.Println("failed write the json", err)
+		return err
 	}
 
-	w.Header().Set("Conten-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"message": "data berhasil disimpan"}`))
-
+	return os.WriteFile(file, content, 0644)
 
 }
 
